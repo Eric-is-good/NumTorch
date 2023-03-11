@@ -17,19 +17,19 @@
 
 ### 基本框架
 
-![](C:\Users\eric1\Desktop\python\NumTorch\imgs\1.png)
+![](https://github.com/Eric-is-good/NumTorch/blob/main/imgs/1.png)
 
 
 
 ### 计算图前向传播
 
-![](C:\Users\eric1\Desktop\python\NumTorch\imgs\2.png)
+![](https://github.com/Eric-is-good/NumTorch/blob/main/imgs/2.png)
 
 
 
 ### 计算图反向传播
 
-![](C:\Users\eric1\Desktop\python\NumTorch\imgs\3.png)
+![](https://github.com/Eric-is-good/NumTorch/blob/main/imgs/3.png)
 
 ### 自动微分
 
