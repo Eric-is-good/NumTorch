@@ -18,26 +18,31 @@
 <!-- TOC -->
 
 - [NumTorch](#numtorch)
-    - [1. 缘由](#1-%E7%BC%98%E7%94%B1)
-    - [2. API](#2-api)
-        - [2.1. tensor 基类](#21-tensor-%E5%9F%BA%E7%B1%BB)
-    - [3. 开发文档](#3-%E5%BC%80%E5%8F%91%E6%96%87%E6%A1%A3)
-        - [3.1. 基本框架](#31-%E5%9F%BA%E6%9C%AC%E6%A1%86%E6%9E%B6)
-        - [3.2. 计算图前向传播](#32-%E8%AE%A1%E7%AE%97%E5%9B%BE%E5%89%8D%E5%90%91%E4%BC%A0%E6%92%AD)
-        - [3.3. 计算图反向传播](#33-%E8%AE%A1%E7%AE%97%E5%9B%BE%E5%8F%8D%E5%90%91%E4%BC%A0%E6%92%AD)
-        - [3.4. 自动微分](#34-%E8%87%AA%E5%8A%A8%E5%BE%AE%E5%88%86)
-        - [3.5. 静态图](#35-%E9%9D%99%E6%80%81%E5%9B%BE)
-            - [3.5.1. 基本图](#351-%E5%9F%BA%E6%9C%AC%E5%9B%BE)
-            - [3.5.2. node节点](#352-node%E8%8A%82%E7%82%B9)
-            - [3.5.3. 静态图的运算功能](#353-%E9%9D%99%E6%80%81%E5%9B%BE%E7%9A%84%E8%BF%90%E7%AE%97%E5%8A%9F%E8%83%BD)
-            - [3.5.4. 运算代码优化为数学表达式（利用运算符重载）](#354-%E8%BF%90%E7%AE%97%E4%BB%A3%E7%A0%81%E4%BC%98%E5%8C%96%E4%B8%BA%E6%95%B0%E5%AD%A6%E8%A1%A8%E8%BE%BE%E5%BC%8F%E5%88%A9%E7%94%A8%E8%BF%90%E7%AE%97%E7%AC%A6%E9%87%8D%E8%BD%BD)
-            - [3.5.5. 拓扑排序](#355-%E6%8B%93%E6%89%91%E6%8E%92%E5%BA%8F)
-            - [3.5.6. 前向传播](#356-%E5%89%8D%E5%90%91%E4%BC%A0%E6%92%AD)
-            - [3.5.7. 反向传播](#357-%E5%8F%8D%E5%90%91%E4%BC%A0%E6%92%AD)
-        - [3.6. 动态图](#36-%E5%8A%A8%E6%80%81%E5%9B%BE)
-            - [3.6.1. 与静态图的区别](#361-%E4%B8%8E%E9%9D%99%E6%80%81%E5%9B%BE%E7%9A%84%E5%8C%BA%E5%88%AB)
-            - [3.6.2. 大体思路](#362-%E5%A4%A7%E4%BD%93%E6%80%9D%E8%B7%AF)
-            - [3.6.3. 动态图的实现](#363-%E5%8A%A8%E6%80%81%E5%9B%BE%E7%9A%84%E5%AE%9E%E7%8E%B0)
+  - [1. 缘由](#1-缘由)
+  - [2. API](#2-api)
+    - [2.1. tensor 基类](#21-tensor-基类)
+  - [3. 开发文档](#3-开发文档)
+    - [3.1. 基本框架](#31-基本框架)
+    - [3.2. 计算图前向传播](#32-计算图前向传播)
+    - [3.3. 计算图反向传播](#33-计算图反向传播)
+    - [3.4. 自动微分](#34-自动微分)
+    - [3.5. 静态图](#35-静态图)
+      - [3.5.1. 基本图](#351-基本图)
+      - [3.5.2. node节点](#352-node节点)
+      - [3.5.3. 静态图的运算功能](#353-静态图的运算功能)
+      - [3.5.4. 运算代码优化为数学表达式（利用运算符重载）](#354-运算代码优化为数学表达式利用运算符重载)
+      - [3.5.5. 拓扑排序](#355-拓扑排序)
+      - [3.5.6. 前向传播](#356-前向传播)
+      - [3.5.7. 反向传播](#357-反向传播)
+    - [3.6. 动态图](#36-动态图)
+      - [3.6.1. 与静态图的区别](#361-与静态图的区别)
+      - [3.6.2. 大体思路](#362-大体思路)
+      - [3.6.3. 动态图的实现](#363-动态图的实现)
+    - [3.7. 网络层](#37-网络层)
+      - [3.7.1. 基本布局](#371-基本布局)
+      - [3.7.2. Module 类](#372-module-类)
+      - [3.7.3. 权重类 parameter.py](#373-权重类-parameterpy)
+      - [3.7.4. 以 linear 为例](#374-以-linear-为例)
 
 <!-- /TOC -->
 
@@ -737,3 +742,235 @@ def backward(self, retain_graph=False):
             node.out_deg_com = 0
         NaiveGraph.node_list = new_list
 ```
+
+
+
+### 3.7. 网络层
+
+#### 3.7.1. 基本布局
+
+在 NumTorch.nn 包里面实现，具体如下
+
+```powershell
+C:.
+│   functional.py
+│   init.py
+│   parameter.py
+│   __init__.py
+│
+└───modules
+        activation.py
+        batchnorm.py
+        conv.py
+        dropout.py
+        linear.py
+        loss.py
+        module.py
+        rnn.py
+        __init__.py
+
+```
+
+在原版 pytorch 中，所有 网络层继承 Module 类，该类整理了权重为列表，并使得网络可以成树状组建，**提供了神经网络的统一连接和搭建方法**
+
+```python
+class Module:
+    r"""Base class for all neural network modules.
+
+    Your models should also subclass this class.
+
+    Modules can also contain other Modules, allowing to nest them in
+    a tree structure. You can assign the submodules as regular attributes::
+
+        import torch.nn as nn
+        import torch.nn.functional as F
+
+        class Model(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv1 = nn.Conv2d(1, 20, 5)
+                self.conv2 = nn.Conv2d(20, 20, 5)
+
+            def forward(self, x):
+                x = F.relu(self.conv1(x))
+                return F.relu(self.conv2(x))
+
+    Submodules assigned in this way will be registered, and will have their
+    parameters converted too when you call :meth:`to`, etc.
+
+    .. note::
+        As per the example above, an ``__init__()`` call to the parent class
+        must be made before assignment on the child.
+
+    :ivar training: Boolean represents whether this module is in training or
+                    evaluation mode.
+    :vartype training: bool
+    """
+```
+
+pytorch中，functional.py 中存放着调用 c 的接口，而各个函数的 python 部分在 modules 下完成，下面为原版 pytorch
+
+```python
+# linear.py 调用 functional.py 
+
+import functional as F
+def forward(self, input: Tensor) -> Tensor:
+    return F.linear(input, self.weight, self.bias)
+
+
+# functional.py 中的 F.linear
+
+linear = _add_docstr(
+    torch._C._nn.linear,
+    r"""
+linear(input, weight, bias=None) -> Tensor 
+...  """
+    
+
+```
+
+pytorch 在 parameter.py 中将 tensor 封装成 **网络权重**
+
+```python
+# parameter.py
+class Parameter(torch.Tensor, metaclass=_ParameterMeta):
+    r"""A kind of Tensor that is to be considered a module parameter.
+
+    Parameters are :class:`~torch.Tensor` subclasses, that have a
+    very special property when used with :class:`Module` s - when they're
+    assigned as Module attributes they are automatically added to the list of
+    its parameters, and will appear e.g. in :meth:`~Module.parameters` iterator.
+    Assigning a Tensor doesn't have such effect. This is because one might
+    want to cache some temporary state, like last hidden state of the RNN, in
+    the model. If there was no such class as :class:`Parameter`, these
+    temporaries would get registered too.
+    """
+
+   
+# 在 linear.py 中初始化调用    
+self.weight = Parameter(torch.empty((out_features, in_features), **factory_kwargs))
+```
+
+pytorch 在 init.py 里面提供了工具类，例如初始化权重的算法
+
+```python
+def kaiming_uniform_(
+    tensor: Tensor, a: float = 0, mode: str = 'fan_in', nonlinearity: str = 'leaky_relu'
+):
+```
+
+我们将模仿这个过程
+
+
+
+#### 3.7.2. Module 类
+
+```python
+class Module:
+    def __init__(self) -> None:
+        self._train = True
+        self._parameters = OrderedDict()   # 有序字典装权重表
+
+    def __call__(self, *x) -> Tensor:
+        return self.forward(*x)
+
+    def __setattr__(self, __name: str, __value) -> None:   # 属性赋值，重载是为了将权重同步到有序字典里
+        self.__dict__[__name] = __value
+        if isinstance(__value, Parameter):
+            self._parameters[__name] = __value
+        if isinstance(__value, Module):
+            for key in __value._parameters:
+                self._parameters[__name + "." + key] = __value._parameters[key]
+
+    def __repr__(self) -> str:
+        module_list = [
+            module for module in self.__dict__.items()
+            if isinstance(module[1], Module)
+        ]
+        return "{}(\n{}\n)".format(
+            self.__class__.__name__,
+            "\n".join([
+                "{:>10} : {}".format(module_name, module)
+                for module_name, module in module_list
+            ]),
+        )
+
+    def parameters(self):
+        for param in self._parameters.values():
+            yield param
+
+    def train(self, mode: bool = True):
+        set_grad_enabled(mode)
+        self.set_module_state(mode)
+
+    def set_module_state(self, mode: bool):
+        self._train = mode
+        for module in self.__dict__.values():
+            if isinstance(module, Module):
+                module.set_module_state(mode)
+
+    def forward(self, x: Tensor) -> Tensor:
+        raise NotImplementedError
+
+    def eval(self):
+        return self.train(False)
+```
+
+
+
+#### 3.7.3. 权重类 parameter.py
+
+在 parameter.py 里面 创建 **权重类**，其实就是一个带梯度的 tensor
+
+```python
+class Parameter(Tensor):
+    def __init__(self, data: Tensor) -> None:
+        super().__init__(data.data, True, float)
+
+    def __repr__(self) -> str:
+        return "Parameter : {}".format(self.data)
+```
+
+
+
+#### 3.7.4. 以 linear 为例
+
+在 linear.py 里初始化，并调用 parameter.py 初始化权重，调用 functional.py 进行前向传播
+
+```python
+class Linear(Module):
+    def __init__(self, in_features, out_features, bias=True) -> None:
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight = Parameter(empty((self.in_features, self.out_features)))   # 调用 parameter.py
+        self.bias = Parameter(empty(self.out_features)) if bias else None
+        self.reset_paramters()
+
+    def reset_paramters(self):
+        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan(self.weight)
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+            init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, x: Tensor):
+        return F.linear(x, self.weight, self.bias)           # 调用 functional.py 
+
+    def __repr__(self) -> str:
+        return "Linear(in_features={}, out_features={}, bias={})".format(
+            self.in_features, self.out_features, self.bias is not None)
+```
+
+
+
+functional.py 中前向传播~~（我们没有 c 语言库）~~
+
+```python
+def linear(x: tensor.Tensor, weight: tensor.Tensor, bias: tensor.Tensor):
+    affine = x @ weight
+    if bias is not None:
+        affine = affine + bias
+    return affine
+```
+

@@ -330,7 +330,7 @@ class Tensor:
             other = other.data
         return Tensor(self.data >= other)
 
-    def backward(self, retain_graph=False):
+    def backward(self, gradient=None, retain_graph=False):
         '''
         以节点为输出进行反向传播
 
@@ -352,9 +352,15 @@ class Tensor:
             print("AD failed because the node is not in graph.")
             return
 
-        assert self.data.ndim == 0, "backward should be called only on a scalar."
+        # assert self.data.ndim == 0, "backward should be called only on a scalar."
 
-        self.grad = np.ones_like(self.data)
+        if gradient is None:
+            self.grad = np.ones_like(self.data)
+        elif gradient.shape == self.data.shape:
+            self.grad = gradient
+        else:
+            assert False, "gradient shape not match the data shape"
+
         for i in range(len(Graph.node_list) - 1, -1, -1):  # 从后往前
             if Graph.node_list[i] is self:
                 y_id = i
@@ -460,6 +466,8 @@ class BinaryOperator(Tensor):
             x = Tensor(x)
         if not isinstance(y, Tensor):
             y = Tensor(y)
+
+        # 生成一个 node（tensor）
         super().__init__(
             self.forward(x, y),
             is_grad_enable() and (x.requires_grad or y.requires_grad),
@@ -620,9 +628,6 @@ class pow(BinaryOperator):
 class matmul(BinaryOperator):
     '''
     矩阵乘法算子，在Tensor类中进行重载，张量的矩阵乘法遵从NumPy Matmul的规则.
-
-    参考 : https://welts.xyz/2022/04/26/broadcast/
-
     See also
     --------
     add : 加法算子

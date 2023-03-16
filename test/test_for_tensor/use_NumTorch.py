@@ -18,6 +18,7 @@ b = 2 * a
 print(b)
 print(b.is_leaf)
 
+import numpy as np
 c = b.sum(0)
 print(c.is_leaf)
 c.backward()
