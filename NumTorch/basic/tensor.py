@@ -67,14 +67,15 @@ class Tensor:
     >>> y = Tensor([1, 2, 3], dtype=float)
     >>> z = Tensor(np.random.rand(3, 4))
     '''
+
     def __init__(self, data, requires_grad: bool = False, dtype=None) -> None:
         if isinstance(data, Tensor):
             data = data.data
         self.data: np.ndarray = np.array(data, dtype)
         self.requires_grad: bool = requires_grad and is_grad_enable()
         assert not (
-            self.requires_grad and self.dtype != float
-            and self.dtype != complex
+                self.requires_grad and self.dtype != float
+                and self.dtype != complex
         ), "Only Tensors of floating point and complex dtype can require gradients"
         self.grad: np.ndarray = np.zeros_like(
             self.data) if self.requires_grad else None
@@ -332,34 +333,39 @@ class Tensor:
 
     def backward(self, gradient=None, retain_graph=False):
         '''
-        以节点为输出进行反向传播
+                以节点为输出进行反向传播
 
-        Parameters
-        ----------
-        retain_graph : bool, default=False
-            是否保留计算图
+                Parameters
+                ----------
+                retain_graph : bool, default=False
+                    是否保留计算图
 
-        Example
-        -------
-        >>> from NumTorch import Tensor
-        >>> x = Tensor(2., requires_grad=True)
-        >>> y = x**2 + x - 1
-        >>> y.backward()
-        >>> x.grad
-        5.
-        '''
+                Example
+                -------
+                >>> from NumTorch import Tensor
+                >>> x = Tensor(2., requires_grad=True)
+                >>> y = x**2 + x - 1
+                >>> y.backward()
+                >>> x.grad
+                5.
+                '''
+
+        if gradient is None:
+            self._backward(retain_graph=retain_graph)
+        else:
+            flat_self = reshape(self, (-1))
+            flat_gradient = reshape(gradient, (-1))
+            change_to_scalar = flat_self @ flat_gradient.T
+            change_to_scalar.backward(retain_graph=retain_graph)
+
+    def _backward(self, retain_graph=False):
         if self not in Graph.node_list:
             print("AD failed because the node is not in graph.")
             return
 
-        # assert self.data.ndim == 0, "backward should be called only on a scalar."
+        assert self.data.ndim == 0, "backward should be called only on a scalar."
 
-        if gradient is None:
-            self.grad = np.ones_like(self.data)
-        elif gradient.shape == self.data.shape:
-            self.grad = gradient
-        else:
-            assert False, "gradient shape not match the data shape"
+        self.grad = np.ones_like(self.data)
 
         for i in range(len(Graph.node_list) - 1, -1, -1):  # 从后往前
             if Graph.node_list[i] is self:
@@ -416,6 +422,7 @@ class UnaryOperator(Tensor):
     >>> x = Tensor(1.)
     >>> y = exp(x)
     '''
+
     def __init__(self, x: Tensor) -> None:
         if not isinstance(x, Tensor):
             x = Tensor(x)
@@ -461,6 +468,7 @@ class BinaryOperator(Tensor):
     >>> y = Tensor(2.)
     >>> z = add(x, y)
     '''
+
     def __init__(self, x: Tensor, y: Tensor) -> None:
         if not isinstance(x, Tensor):
             x = Tensor(x)
@@ -498,6 +506,7 @@ class BinaryOperator(Tensor):
 
 class MultiOperator(Tensor):
     '''多元运算算子基类'''
+
     def __init__(self, *tensors) -> None:
         requires_grad = False
         tensors = list(tensors)
@@ -533,6 +542,7 @@ class add(BinaryOperator):
     >>> z = add(x, y) # 在Tensor类中进行了重载，所以也可以写成
     >>> z = x + y
     '''
+
     def forward(self, x: Tensor, y: Tensor):
         return x.data + y.data
 
@@ -548,6 +558,7 @@ class sub(BinaryOperator):
     --------
     add : 加法算子
     '''
+
     def forward(self, x: Tensor, y: Tensor):
         return x.data - y.data
 
@@ -571,6 +582,7 @@ class mul(BinaryOperator):
     --------
     add : 加法算子
     '''
+
     def __init__(self, x: Tensor, y: Tensor) -> None:
         super().__init__(x, y)
 
@@ -591,6 +603,7 @@ class div(BinaryOperator):
     --------
     add : 加法算子
     '''
+
     def __init__(self, x: Tensor, y: Tensor) -> None:
         super().__init__(x, y)
 
@@ -612,11 +625,12 @@ class pow(BinaryOperator):
     --------
     add : 加法算子
     '''
+
     def __init__(self, x: Tensor, y: Tensor) -> None:
         super().__init__(x, y)
 
     def forward(self, x: Tensor, y: Tensor):
-        return x.data**y.data
+        return x.data ** y.data
 
     def grad_fn(self, node: Tensor, grad: np.ndarray) -> np.ndarray:
         if node is self.last[0]:
@@ -632,6 +646,7 @@ class matmul(BinaryOperator):
     --------
     add : 加法算子
     '''
+
     def __init__(self, x: Tensor, y: Tensor) -> None:
         super().__init__(x, y)
 
@@ -667,6 +682,7 @@ class abs(UnaryOperator):
     --------
     add : 加法算子
     '''
+
     def forward(self, x: Tensor) -> np.ndarray:
         return np.abs(x)
 
@@ -699,6 +715,7 @@ class sum(UnaryOperator):
     >>> s3 = sum(x, keepdims=True) # [[21]]
     ```
     '''
+
     def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
         self.axis = axis
         self.keepdims = keepdims
@@ -728,6 +745,7 @@ class mean(UnaryOperator):
     --------
     sum : 求和算子
     '''
+
     def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
         self.axis = axis
         self.keepdims = keepdims
@@ -757,6 +775,7 @@ class max(UnaryOperator):
     --------
     sum : 求和算子
     '''
+
     def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
         self.axis = axis
         self.keepdims = keepdims
@@ -790,6 +809,7 @@ class min(UnaryOperator):
     --------
     max : 求最大值算子
     '''
+
     def __init__(self, x: Tensor, axis=None, keepdims=False) -> None:
         self.axis = axis
         self.keepdims = keepdims
@@ -838,6 +858,7 @@ class exp(UnaryOperator):
     >>> x = Tensor(1.)
     >>> y = exp(x)
     '''
+
     def forward(self, x: Tensor):
         return np.exp(x.data)
 
@@ -853,6 +874,7 @@ class log(UnaryOperator):
     >>> x = Tensor(1.)
     >>> y = log(x)
     '''
+
     def forward(self, x: Tensor):
         return np.log(x.data)
 
@@ -878,7 +900,7 @@ class minimum(BinaryOperator):
 
 def sqrt(x: Tensor):
     '''平方根函数'''
-    return x**0.5
+    return x ** 0.5
 
 
 def square(x: Tensor):
@@ -893,10 +915,11 @@ class reshape(UnaryOperator):
 
     Parameters
     ----------
-    new_shape : tuple
+    new_shape
         变换后的形状，用法同NumPy
     '''
-    def __init__(self, x: Tensor, new_shape: tuple) -> None:
+
+    def __init__(self, x: Tensor, new_shape) -> None:
         self.new_shape = new_shape
         super().__init__(x)
 
@@ -916,6 +939,7 @@ class transpose(UnaryOperator):
     axes : tuple
         转置的轴变换，用法同NumPy
     '''
+
     def __init__(self, x: Tensor, axes: tuple = None) -> None:
         self.axes = axes
         super().__init__(x)
@@ -946,6 +970,7 @@ class get_slice(UnaryOperator):
      [1. 1. 0. 0.]
      [0. 0. 0. 0.]]
     '''
+
     def __init__(self, x: Tensor, key) -> None:
         if isinstance(key, Tensor):
             self.key = key.data
@@ -972,6 +997,7 @@ class concatenate(Tensor):
     axis : default=0
         连接轴，默认是沿着第一个轴拼接.
     '''
+
     def __init__(self, *tensors, axis=0) -> None:
         requires_grad = False
         self.tensors = list(tensors)
@@ -1026,6 +1052,10 @@ def ones(shape, requires_grad=False):
         是否需要求导
     '''
     return Tensor(np.ones(shape), requires_grad=requires_grad)
+
+
+def ones_like(input_tensor: Tensor):
+    return ones(input_tensor.shape)
 
 
 def randn(*shape, requires_grad=False):

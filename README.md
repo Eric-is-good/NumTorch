@@ -8,13 +8,6 @@
 在读大学时上 [**人工智能课**](https://github.com/Eric-is-good/2022_AI_lesson)，老师叫我们模仿写一个梯度回传的神经网络，当时是基于网络层 layer 写的，不具有通用性，这次打算基于张量 tensor 来写一个框架。**[学习地址](https://github.com/Kaslanarian/PyDyNet)**。
 
 
-
-
-## 2. API
-
-### 2.1. tensor 基类
-
-
 <!-- TOC -->
 
 - [NumTorch](#numtorch)
@@ -507,6 +500,14 @@ def jacobi(cls, y_list: list, x_list: list):
 
 
 
+#### 非标量的反向传播
+
+![](https://img-blog.csdnimg.cn/20200509110539884.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L0hhcHBpbmVzc1NvdXJjZUw=,size_16,color_FFFFFF,t_70)
+
+
+
+
+
 ### 3.6. 动态图
 
 #### 3.6.1. 与静态图的区别
@@ -973,4 +974,110 @@ def linear(x: tensor.Tensor, weight: tensor.Tensor, bias: tensor.Tensor):
         affine = affine + bias
     return affine
 ```
+
+
+
+### 使用框架开发
+
+我们已经完成了所有基本框架，我们再次基础上二次开发，实现一些应用层面的东西，例如一些常用神经网络，一些常用优化器，一些常用批处理 trick。
+
+#### 
+
+#### 卷积神经网络
+
+![](https://pic3.zhimg.com/v2-7fce29335f9b43bce1b373daa40cccba_b.webp)
+
+卷积本身很简单，最简单的方法就是遍历移动，就两个 for 循环，但这显然不符合并行化。
+
+卷积并行化的常用方法是 **im2col+GEMM**。使用 im2col 转化为矩阵乘法，再用 GEMM 优化。
+
+常规的卷积操作为：
+
+<img src="https://img-blog.csdnimg.cn/20190109205748603.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzMyOTk4NTkz,size_16,color_FFFFFF,t_70" style="zoom: 67%;" />
+
+<img src="https://img-blog.csdnimg.cn/20190109205814109.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzMyOTk4NTkz,size_16,color_FFFFFF,t_70" style="zoom:67%;" />
+
+转化
+
+<img src="https://img-blog.csdnimg.cn/2019010920593847.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzMyOTk4NTkz,size_16,color_FFFFFF,t_70" style="zoom:67%;" />
+
+此时的卷积操作就可转化为矩阵乘法：
+
+<img src="https://img-blog.csdnimg.cn/20200215213604226.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzIwODgwNDE1,size_16,color_FFFFFF,t_70" style="zoom:67%;" />
+
+
+
+举个例子来说明 GEMM 矩阵乘法优化算法
+
+1.直接暴力矩阵乘法：
+
+```c++
+for (int m = 0; m < M; m++) {
+    for (int n = 0; n < N; n++) {
+        for (int k = 0; k < K; k++) {
+            C[m][n]+= A[m][k] * B[k][n];
+        }
+    }
+}
+```
+
+上述公式总计算量为2MNK (其中 𝑀、𝑁、𝐾 分别指代三层循环执行的次数，2 指代循环最内层的一次乘法和加法） ，内存访问操作总数为 4MNK（其中 4 指代对c取存和取a，b）。GEMM 的优化均以此为基点。
+
+
+
+2.将输出的计算拆分为 1×4 的小块，即将 𝑁 维度拆分为两部分。计算该块输出时，需要使用 𝐴 矩阵的 1 行，和 𝐵 矩阵的 4 列。
+
+每次入第 i 个（列）黄和第 i 行绿（看起来和正常矩阵运算刚刚相反）
+
+![](https://pic2.zhimg.com/80/v2-a4a3ba5a21012600872e1f3f7e15bc59_720w.webp)
+
+```c++
+for (int m = 0; m < M; m++) {
+  for (int n = 0; n < N; n += 4) {
+    C[m][n + 0] = 0;
+    C[m][n + 1] = 0;
+    C[m][n + 2] = 0;
+    C[m][n + 3] = 0;
+    for (int k = 0; k < K; k++) {
+      C[m][n + 0] += A[m][k] * B[k][n + 0];
+      C[m][n + 1] += A[m][k] * B[k][n + 1];
+      C[m][n + 2] += A[m][k] * B[k][n + 2];
+      C[m][n + 3] += A[m][k] * B[k][n + 3];
+    }
+  }
+}
+```
+
+简单的观察即可发现，上述伪代码的最内侧计算使用的矩阵 𝐴 的元素是一致的。因此可以将 𝐴[𝑚] [𝑘] 读取到寄存器中，从而实现 4 次数据复用。一般将最内侧循环称作计算核（micro kernel）。进行这样的优化后，内存访问操作数量变为 （3 + 1/4）MNK。（取 a 变成了原来的 1/4）
+
+
+
+3.同理操作b, 每次入第 i 列黄和第 i 行绿，一共k次
+
+![](https://pic3.zhimg.com/80/v2-73afa75e91d9a66a3d194db36f994232_720w.webp)
+
+```c++
+for (int m = 0; m < M; m += 4) {
+  for (int n = 0; n < N; n += 4) {
+    C[m + 0][n + 0..3] = 0;
+    C[m + 1][n + 0..3] = 0;
+    C[m + 2][n + 0..3] = 0;
+    C[m + 3][n + 0..3] = 0;
+    for (int k = 0; k < K; k++) {
+      C[m + 0][n + 0..3] += A[m + 0][k] * B[k][n + 0..3];
+      C[m + 1][n + 0..3] += A[m + 1][k] * B[k][n + 0..3];
+      C[m + 2][n + 0..3] += A[m + 2][k] * B[k][n + 0..3];
+      C[m + 3][n + 0..3] += A[m + 3][k] * B[k][n + 0..3];
+    }
+  }
+}
+```
+
+访存变为 2 +1/4 +1/4 =(2+1/2) MNK
+
+访存可以无限接近于 2 MNK
+
+又可以把 c 移出去 ，所以可以优化到接近 2MN + 1/2 MNK = 1/2 MNK
+
+
 

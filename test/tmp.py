@@ -1,4 +1,5 @@
 import numpy as np
 
-a = np.array([2, 2])
-print(a)
+a = np.ones([2, 3, 3])
+b = np.reshape(a, (-1))
+print(b)
